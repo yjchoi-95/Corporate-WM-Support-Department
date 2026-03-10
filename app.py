@@ -42,7 +42,7 @@ def _render_date_inputs(key_prefix: str):
 def _get_api_key() -> str:
     return st.secrets["DART_API_KEY"]
 
-tabs = st.tabs(["유상증자", "주요사항보고서"])
+tabs = st.tabs(["유상증자", "주식연계채권 등"])
 
 with tabs[0]:
     api_key = _get_api_key()
@@ -103,4 +103,3 @@ with tabs[1]:
                 )
             else:
                 st.warning("조회 결과가 없습니다.")
-
