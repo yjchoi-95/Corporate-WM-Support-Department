@@ -306,7 +306,11 @@ def fetch_paid_increase_decision_df(
         return out
 
     out = _merge_target_metadata(out, target)
-    return _filter_by_rcept_window(out, bgn_de, end_de)
+    out = _filter_by_rcept_window(out, bgn_de, end_de)
+    if "ic_mthn" in out.columns:
+        normalized = out["ic_mthn"].astype(str).str.replace(r"\s+", "", regex=True)
+        out = out.loc[normalized.eq("제3자배정증자")].copy()
+    return out
 
 
 def fetch_cb_bw_unified_df(
@@ -620,6 +624,9 @@ def format_output_df(output_df: pd.DataFrame) -> pd.DataFrame:
         return output_df.copy()
 
     df = output_df.rename(columns=OUT_RENAME_MAP).copy()
+    if "증자방식" in df.columns:
+        normalized = df["증자방식"].astype(str).str.replace(r"\s+", "", regex=True)
+        df = df.loc[normalized.eq("제3자배정증자")].copy()
     for col in OUT_COLUMNS:
         if col not in df.columns:
             df[col] = ""
@@ -749,7 +756,7 @@ def run_major_paid_increase_report_bytes(
         return None
 
     kst_now = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%y%m%d_%H%M")
-    filename = f"DART_주요사항보고서_주식연계채권등_F{bgn_de}_T{end_de}_추출시간_{kst_now}.xlsx"
+    filename = f"DART_주요사항보고서_유상증자결정_F{bgn_de}_T{end_de}_추출시간_{kst_now}.xlsx"
 
     buffer = BytesIO()
     _write_major_excel(buffer, output_df, cb_bw_output_df)
