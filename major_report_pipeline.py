@@ -749,7 +749,7 @@ def run_major_paid_increase_report_bytes(
         return None
 
     kst_now = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%y%m%d_%H%M")
-    filename = f"DART_주요사항보고서_유상증자결정_F{bgn_de}_T{end_de}_추출시간_{kst_now}.xlsx"
+    filename = f"DART_주요사항보고서_주식연계채권등_F{bgn_de}_T{end_de}_추출시간_{kst_now}.xlsx"
 
     buffer = BytesIO()
     _write_major_excel(buffer, output_df, cb_bw_output_df)
