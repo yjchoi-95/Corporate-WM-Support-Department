@@ -193,10 +193,10 @@ def _write_excel(
     with pd.ExcelWriter(file_obj, engine="xlsxwriter") as writer:
         check_list.to_excel(writer, index=False, sheet_name="검토목록")
         df_base.to_excel(writer, index=False, sheet_name="일반사항")
-        df_5.to_excel(writer, index=False, sheet_name="인수인정보")
-        df_2.to_excel(writer, index=False, sheet_name="자금의사용목적")
-        df_3.to_excel(writer, index=False, sheet_name="매출인에관한사항")
-        df_4.to_excel(writer, index=False, sheet_name="일반청약차환매청구권")
+        # df_5.to_excel(writer, index=False, sheet_name="인수인정보")
+        # df_2.to_excel(writer, index=False, sheet_name="자금의사용목적")
+        # df_3.to_excel(writer, index=False, sheet_name="매출인에관한사항")
+        # df_4.to_excel(writer, index=False, sheet_name="일반청약차환매청구권")
 
         workbook = writer.book
         highlight_fmt = workbook.add_format({"bg_color": "#F8D7DA"})
@@ -212,6 +212,7 @@ def _write_excel(
         def apply_highlight(df: pd.DataFrame, sheet_name: str, name_col: str = "회사명"):
             if df.empty or name_col not in df.columns or not chk_range:
                 return
+
             ws = writer.sheets[sheet_name]
             name_col_idx = df.columns.get_loc(name_col)
             col_letter = xl_col_to_name(name_col_idx)
@@ -219,6 +220,7 @@ def _write_excel(
             first_row = 1
             last_row = len(df)
             last_col = len(df.columns) - 1
+
             if last_row < first_row:
                 return
 
@@ -228,15 +230,19 @@ def _write_excel(
                 0,
                 last_row,
                 last_col,
-                {"type": "formula", "criteria": formula, "format": highlight_fmt},
+                {
+                    "type": "formula",
+                    "criteria": formula,
+                    "format": highlight_fmt,
+                },
             )
 
         apply_highlight(check_list, "검토목록")
         apply_highlight(df_base, "일반사항")
-        apply_highlight(df_5, "인수인정보")
-        apply_highlight(df_2, "자금의사용목적")
-        apply_highlight(df_3, "매출인에관한사항")
-        apply_highlight(df_4, "일반청약차환매청구권")
+        # apply_highlight(df_5, "인수인정보")
+        # apply_highlight(df_2, "자금의사용목적")
+        # apply_highlight(df_3, "매출인에관한사항")
+        # apply_highlight(df_4, "일반청약차환매청구권")
 
         def set_url_width(df: pd.DataFrame, sheet_name: str, col_name: str = "URL", width: int = 53):
             if col_name not in df.columns:
@@ -248,6 +254,12 @@ def _write_excel(
         set_url_width(check_list, "검토목록")
         set_url_width(df_base, "일반사항")
 
+        # 핵심: 숨길 시트가 active 시트이면 안 됨
+        if "일반사항" in writer.sheets:
+            writer.sheets["일반사항"].activate()
+
+        if "검토목록" in writer.sheets:
+            writer.sheets["검토목록"].hide()
 
 def run_rights_issue_report(
     api_key: str,
@@ -363,24 +375,31 @@ def run_rights_issue_report(
     sort_cols = [
         "회사명",
         "상장구분",
-        "증권의종류",
+#        "증권의종류",
         "증권수량",
-        "액면가액",
+#        "액면가액",
         "모집(매출)가액",
         "모집(매출)총액",
         "청약기일",
         "납입기일",
-        "청약공고일",
-        "배정공고일",
-        "배정기준일",
+#        "청약공고일",
+#        "배정공고일",
+#        "배정기준일",
         "대표자명",
         "주소",
         "전화번호",
-        "팩스번호",
+#        "팩스번호",
+        '발행회사 담당',
+        '실무담당',
+        '당사 연락처(비고)',
         "URL",
     ]
 
     if not df_base.empty:
+        df_base['발행회사 담당'] = ''
+        df_base['실무담당'] = ''
+        df_base['당사 연락처(비고)'] = ''
+
         df_base = df_base.loc[:, [c for c in sort_cols if c in df_base.columns]]
         if "상장구분" in df_base.columns:
             df_base["상장구분"] = df_base["상장구분"].map(CORP_CLS_MAP)
@@ -394,7 +413,7 @@ def run_rights_issue_report(
     df_2 = _drop_cols(df_2, ["접수번호", "고유번호", "상장구분"])
     df_3 = _drop_cols(df_3, ["접수번호", "고유번호", "상장구분"])
     df_4 = _drop_cols(df_4, ["접수번호", "고유번호", "상장구분"])
-    df_5 = _drop_cols(df_5, ["접수번호", "고유번호", "상장구분"])
+    df_5 = _drop_cols(df_5, ["접수번호", "고유번호", "상장구분"]) 
 
     if not df_base.empty and "납입기일" in df_base.columns:
         df_base = df_base.sort_values(by="납입기일", ascending=False, kind="mergesort")
@@ -536,24 +555,30 @@ def run_rights_issue_report_bytes(
     sort_cols = [
         "회사명",
         "상장구분",
-        "증권의종류",
+#        "증권의종류",
         "증권수량",
-        "액면가액",
+#        "액면가액",
         "모집(매출)가액",
         "모집(매출)총액",
         "청약기일",
         "납입기일",
-        "청약공고일",
-        "배정공고일",
-        "배정기준일",
+#        "청약공고일",
+#        "배정공고일",
+#        "배정기준일",
         "대표자명",
         "주소",
         "전화번호",
-        "팩스번호",
+#        "팩스번호",
+        '발행회사 담당',
+        '실무담당',
+        '당사 연락처(비고)',
         "URL",
     ]
 
     if not df_base.empty:
+        df_base['발행회사 담당'] = ''
+        df_base['실무담당'] = ''
+        df_base['당사 연락처(비고)'] = ''
         df_base = df_base.loc[:, [c for c in sort_cols if c in df_base.columns]]
         if "상장구분" in df_base.columns:
             df_base["상장구분"] = df_base["상장구분"].map(CORP_CLS_MAP)
