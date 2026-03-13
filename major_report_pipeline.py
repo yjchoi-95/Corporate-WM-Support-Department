@@ -21,7 +21,7 @@ warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 LIST_API_URL = "https://opendart.fss.or.kr/api/list.json"
 PIIC_API_URL = "https://opendart.fss.or.kr/api/piicDecsn.json"
 CB_API_URL = "https://opendart.fss.or.kr/api/cvbdIsDecsn.json"
-BW_API_URL = "https://opendart.fss.or.kr/api/bwbdIsDecsn.json"
+BW_API_URL = "https://opendart.fss.or.kr/api/bdwtIsDecsn.json"
 DOC_API_URL = "https://opendart.fss.or.kr/api/document.xml"
 
 PAID_INCREASE_REPORT_TITLES = {
