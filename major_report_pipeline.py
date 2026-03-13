@@ -27,7 +27,7 @@ DOC_API_URL = "https://opendart.fss.or.kr/api/document.xml"
 TARGET_REPORT_TITLES = {
     "주요사항보고서(유상증자결정)",
     "주요사항보고서(전환사채권발행결정)",
-    "주요사항보고서(신주인수권부사채발행결정)",
+    "주요사항보고서(신주인수권부사채권발행결정)",
 }
 
 OUT_RENAME_MAP = {
