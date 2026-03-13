@@ -24,11 +24,20 @@ CB_API_URL = "https://opendart.fss.or.kr/api/cvbdIsDecsn.json"
 BW_API_URL = "https://opendart.fss.or.kr/api/bwbdIsDecsn.json"
 DOC_API_URL = "https://opendart.fss.or.kr/api/document.xml"
 
-TARGET_REPORT_TITLES = {
+PAID_INCREASE_REPORT_TITLES = {
     "주요사항보고서(유상증자결정)",
-    "주요사항보고서(전환사채권발행결정)",
-    "주요사항보고서(신주인수권부사채권발행결정)",
 }
+
+CB_REPORT_TITLES = {
+    "주요사항보고서(전환사채권발행결정)",
+}
+
+BW_REPORT_TITLES = {
+    "주요사항보고서(신주인수권부사채권발행결정)",
+    "주요사항보고서(신주인수권부사채발행결정)",
+}
+
+TARGET_REPORT_TITLES = PAID_INCREASE_REPORT_TITLES | CB_REPORT_TITLES | BW_REPORT_TITLES
 
 OUT_RENAME_MAP = {
     "corp_name": "회사명",
@@ -78,6 +87,11 @@ def normalize_report_nm(report_nm: str) -> str:
     s = str(report_nm)
     s = re.sub(r"^\s*(\[[^\]]+\]\s*)+", "", s)
     return s.strip()
+
+
+def is_third_party_allotment(method: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(method))
+    return "제3자배정" in normalized and "증자" in normalized
 
 
 def to_numeric_series(series: pd.Series) -> pd.Series:
@@ -287,7 +301,7 @@ def fetch_paid_increase_decision_df(
     bgn_for_api = (datetime.strptime(bgn_de, "%Y%m%d") - relativedelta(months=8)).strftime("%Y%m%d")
 
     target = major_list_df[
-        major_list_df["report_nm"].apply(normalize_report_nm).eq("주요사항보고서(유상증자결정)")
+        major_list_df["report_nm"].apply(normalize_report_nm).isin(PAID_INCREASE_REPORT_TITLES)
     ].copy()
     if target.empty:
         return pd.DataFrame()
@@ -308,8 +322,7 @@ def fetch_paid_increase_decision_df(
     out = _merge_target_metadata(out, target)
     out = _filter_by_rcept_window(out, bgn_de, end_de)
     if "ic_mthn" in out.columns:
-        normalized = out["ic_mthn"].astype(str).str.replace(r"\s+", "", regex=True)
-        out = out.loc[normalized.eq("제3자배정증자")].copy()
+        out = out.loc[out["ic_mthn"].apply(is_third_party_allotment)].copy()
     return out
 
 
@@ -324,10 +337,10 @@ def fetch_cb_bw_unified_df(
     bgn_for_api = (datetime.strptime(bgn_de, "%Y%m%d") - relativedelta(months=8)).strftime("%Y%m%d")
 
     cb_target = major_list_df[
-        major_list_df["report_nm"].apply(normalize_report_nm).eq("주요사항보고서(전환사채권발행결정)")
+        major_list_df["report_nm"].apply(normalize_report_nm).isin(CB_REPORT_TITLES)
     ].copy()
     bw_target = major_list_df[
-        major_list_df["report_nm"].apply(normalize_report_nm).eq("주요사항보고서(신주인수권부사채발행결정)")
+        major_list_df["report_nm"].apply(normalize_report_nm).isin(BW_REPORT_TITLES)
     ].copy()
 
     cb_codes = cb_target["corp_code"].dropna().astype(str).unique().tolist()
@@ -625,8 +638,7 @@ def format_output_df(output_df: pd.DataFrame) -> pd.DataFrame:
 
     df = output_df.rename(columns=OUT_RENAME_MAP).copy()
     if "증자방식" in df.columns:
-        normalized = df["증자방식"].astype(str).str.replace(r"\s+", "", regex=True)
-        df = df.loc[normalized.eq("제3자배정증자")].copy()
+        df = df.loc[df["증자방식"].apply(is_third_party_allotment)].copy()
     for col in OUT_COLUMNS:
         if col not in df.columns:
             df[col] = ""
