@@ -9,6 +9,13 @@ from ri_pipeline import run_rights_issue_report_bytes
 st.set_page_config(page_title="법인WM지원부_DART 전자공시 수집 자동화", layout="centered")
 st.title("🏢 DART 전자공시 수집 자동화")
 
+def _clamp_date(value: date, min_value: date, max_value: date) -> date:
+    if value < min_value:
+        return min_value
+    if value > max_value:
+        return max_value
+    return value
+
 def _render_date_inputs(key_prefix: str):
     today = date.today()
     bgn_key = f"{key_prefix}_bgn_date"
@@ -21,6 +28,7 @@ def _render_date_inputs(key_prefix: str):
 
     bgn_min = st.session_state[end_key] - timedelta(days=45)
     bgn_max = min(st.session_state[end_key] + timedelta(days=45), today)
+    st.session_state[bgn_key] = _clamp_date(st.session_state[bgn_key], bgn_min, bgn_max)
     bgn_date = st.date_input(
         "시작일자",
         min_value=bgn_min,
@@ -30,6 +38,7 @@ def _render_date_inputs(key_prefix: str):
 
     end_min = bgn_date - timedelta(days=45)
     end_max = min(bgn_date + timedelta(days=45), today)
+    st.session_state[end_key] = _clamp_date(st.session_state[end_key], end_min, end_max)
     end_date = st.date_input(
         "종료일자",
         min_value=end_min,
