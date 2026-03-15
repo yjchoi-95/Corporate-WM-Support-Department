@@ -6,8 +6,12 @@ from major_report_pipeline import run_major_paid_increase_report_bytes
 from ri_pipeline import run_rights_issue_report_bytes
 
 
-st.set_page_config(page_title="법인WM지원부_DART 전자공시 수집 자동화", layout="centered")
-st.title("🏢 DART 전자공시 수집 자동화")
+st.set_page_config(
+    page_title="법인WM지원부_DART 공시 수집 자동화",
+    layout="centered",
+)
+st.title("DART 공시 수집 자동화")
+
 
 def _clamp_date(value: date, min_value: date, max_value: date) -> date:
     if value < min_value:
@@ -15,6 +19,7 @@ def _clamp_date(value: date, min_value: date, max_value: date) -> date:
     if value > max_value:
         return max_value
     return value
+
 
 def _render_date_inputs(key_prefix: str):
     today = date.today()
@@ -26,11 +31,17 @@ def _render_date_inputs(key_prefix: str):
     if end_key not in st.session_state:
         st.session_state[end_key] = today
 
-    bgn_min = st.session_state[end_key] - timedelta(days=45)
-    bgn_max = min(st.session_state[end_key] + timedelta(days=45), today)
-    st.session_state[bgn_key] = _clamp_date(st.session_state[bgn_key], bgn_min, bgn_max)
+    current_end = _clamp_date(st.session_state[end_key], today - timedelta(days=45), today)
+    bgn_min = current_end - timedelta(days=45)
+    bgn_max = min(current_end + timedelta(days=45), today)
+    current_bgn = _clamp_date(st.session_state[bgn_key], bgn_min, bgn_max)
+
+    st.session_state[bgn_key] = current_bgn
+    st.session_state[end_key] = current_end
+
     bgn_date = st.date_input(
         "시작일자",
+        value=current_bgn,
         min_value=bgn_min,
         max_value=bgn_max,
         key=bgn_key,
@@ -38,9 +49,12 @@ def _render_date_inputs(key_prefix: str):
 
     end_min = bgn_date - timedelta(days=45)
     end_max = min(bgn_date + timedelta(days=45), today)
-    st.session_state[end_key] = _clamp_date(st.session_state[end_key], end_min, end_max)
+    current_end = _clamp_date(st.session_state[end_key], end_min, end_max)
+    st.session_state[end_key] = current_end
+
     end_date = st.date_input(
         "종료일자",
+        value=current_end,
         min_value=end_min,
         max_value=end_max,
         key=end_key,
@@ -48,10 +62,12 @@ def _render_date_inputs(key_prefix: str):
 
     return bgn_date, end_date
 
+
 def _get_api_key() -> str:
     return st.secrets["DART_API_KEY"]
 
-tabs = st.tabs(["유상증자", "주식연계채권 등"])
+
+tabs = st.tabs(["유상증자", "주식등의대량보유상황보고서"])
 
 with tabs[0]:
     api_key = _get_api_key()
