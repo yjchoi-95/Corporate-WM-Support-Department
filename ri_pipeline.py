@@ -158,6 +158,21 @@ def get_company_overview_fields(api_key: str, corp_code: str) -> pd.DataFrame:
     )
 
 
+def get_empty_company_overview_fields(corp_code: str) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "corp_code": corp_code,
+                "bizr_no": "",
+                "ceo_nm": "",
+                "adres": "",
+                "phn_no": "",
+                "fax_no": "",
+            }
+        ]
+    )
+
+
 def format_bizr_no(value) -> str:
     if pd.isna(value):
         return ""
@@ -369,8 +384,8 @@ def run_rights_issue_report(
         try:
             overview = get_company_overview_fields(api_key, corp_code)
         except Exception:
-            print(f"[SKIP] {corp_code} 기업개요 없음")
-            continue
+            print(f"[WARN] {corp_code} 기업개요 없음")
+            overview = get_empty_company_overview_fields(corp_code)
 
         df_kind = dfs.get("증권의종류")
         if df_kind is None or df_kind.empty:
@@ -379,6 +394,11 @@ def run_rights_issue_report(
             df_base = pd.merge(df_base, df_kind)
 
         df_base = df_base.merge(overview, on="corp_code", how="left")
+        if "bizr_no" not in df_base.columns:
+            df_base["bizr_no"] = ""
+        for col in ["ceo_nm", "adres", "phn_no", "fax_no"]:
+            if col not in df_base.columns:
+                df_base[col] = ""
         df_base["URL"] = df_base["rcept_no"].apply(
             lambda x: f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={x}"
         )
@@ -412,6 +432,9 @@ def run_rights_issue_report(
     df_3 = _safe_concat(df3_list)
     df_4 = _safe_concat(df4_list)
     df_5 = _safe_concat(df5_list)
+
+    if not df_base.empty and "사업자등록번호" not in df_base.columns:
+        df_base["사업자등록번호"] = ""
 
     sort_cols = [
         "회사명",
@@ -553,7 +576,7 @@ def run_rights_issue_report_bytes(
         try:
             overview = get_company_overview_fields(api_key, corp_code)
         except Exception:
-            continue
+            overview = get_empty_company_overview_fields(corp_code)
 
         df_kind = dfs.get("증권의종류")
         if df_kind is None or df_kind.empty:
@@ -562,6 +585,11 @@ def run_rights_issue_report_bytes(
             df_base = pd.merge(df_base, df_kind)
 
         df_base = df_base.merge(overview, on="corp_code", how="left")
+        if "bizr_no" not in df_base.columns:
+            df_base["bizr_no"] = ""
+        for col in ["ceo_nm", "adres", "phn_no", "fax_no"]:
+            if col not in df_base.columns:
+                df_base[col] = ""
         df_base["URL"] = df_base["rcept_no"].apply(
             lambda x: f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={x}"
         )
@@ -595,6 +623,9 @@ def run_rights_issue_report_bytes(
     df_3 = _safe_concat(df3_list)
     df_4 = _safe_concat(df4_list)
     df_5 = _safe_concat(df5_list)
+
+    if not df_base.empty and "사업자등록번호" not in df_base.columns:
+        df_base["사업자등록번호"] = ""
 
     sort_cols = [
         "회사명",
