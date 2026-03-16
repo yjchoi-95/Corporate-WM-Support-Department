@@ -184,6 +184,47 @@ def format_bizr_no(value) -> str:
     return text
 
 
+def normalize_corp_code(value) -> str:
+    if pd.isna(value):
+        return ""
+    text = str(value).strip()
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if digits:
+        return digits.zfill(8)
+    return text
+
+
+def merge_company_overview(df_base: pd.DataFrame, overview: pd.DataFrame) -> pd.DataFrame:
+    out = df_base.copy()
+
+    if "corp_code" in out.columns:
+        out["corp_code"] = out["corp_code"].apply(normalize_corp_code)
+    if "corp_code" in overview.columns:
+        overview = overview.copy()
+        overview["corp_code"] = overview["corp_code"].apply(normalize_corp_code)
+
+    merge_cols = ["corp_code", "bizr_no", "ceo_nm", "adres", "phn_no", "fax_no"]
+    overview = overview.loc[:, [c for c in merge_cols if c in overview.columns]].drop_duplicates(subset=["corp_code"])
+
+    out = out.merge(overview, on="corp_code", how="left", suffixes=("", "_overview"))
+
+    for col in ["bizr_no", "ceo_nm", "adres", "phn_no", "fax_no"]:
+        overview_col = f"{col}_overview"
+        if overview_col in out.columns:
+            if col in out.columns:
+                out[col] = out[col].fillna("")
+                out[overview_col] = out[overview_col].fillna("")
+                out[col] = out[col].where(out[col].astype(str).str.strip() != "", out[overview_col])
+            else:
+                out[col] = out[overview_col]
+            out = out.drop(columns=[overview_col])
+
+        if col not in out.columns:
+            out[col] = ""
+
+    return out
+
+
 def _build_report_df(api_key: str, bgn_de: str, end_de: str, report_name: str, report_filter_text: str | None,
                      page_count: int, timeout: int, verify_ssl: bool) -> pd.DataFrame:
     filtered = [
@@ -393,12 +434,7 @@ def run_rights_issue_report(
         else:
             df_base = pd.merge(df_base, df_kind)
 
-        df_base = df_base.merge(overview, on="corp_code", how="left")
-        if "bizr_no" not in df_base.columns:
-            df_base["bizr_no"] = ""
-        for col in ["ceo_nm", "adres", "phn_no", "fax_no"]:
-            if col not in df_base.columns:
-                df_base[col] = ""
+        df_base = merge_company_overview(df_base, overview)
         df_base["URL"] = df_base["rcept_no"].apply(
             lambda x: f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={x}"
         )
@@ -584,12 +620,7 @@ def run_rights_issue_report_bytes(
         else:
             df_base = pd.merge(df_base, df_kind)
 
-        df_base = df_base.merge(overview, on="corp_code", how="left")
-        if "bizr_no" not in df_base.columns:
-            df_base["bizr_no"] = ""
-        for col in ["ceo_nm", "adres", "phn_no", "fax_no"]:
-            if col not in df_base.columns:
-                df_base[col] = ""
+        df_base = merge_company_overview(df_base, overview)
         df_base["URL"] = df_base["rcept_no"].apply(
             lambda x: f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={x}"
         )
