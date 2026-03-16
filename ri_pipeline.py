@@ -225,6 +225,43 @@ def merge_company_overview(df_base: pd.DataFrame, overview: pd.DataFrame) -> pd.
     return out
 
 
+def merge_estk_detail_columns(df_base: pd.DataFrame, dfs: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    out = df_base.copy()
+
+    key_candidates = ["rcept_no", "corp_code", "corp_name", "stock_code", "stock_name"]
+    wanted_cols = ["stksen", "stkcnt", "fv", "slprc", "slta"]
+
+    for _, df_part in dfs.items():
+        if df_part is None or df_part.empty:
+            continue
+
+        available_value_cols = [c for c in wanted_cols if c in df_part.columns]
+        if not available_value_cols:
+            continue
+
+        common_keys = [c for c in key_candidates if c in out.columns and c in df_part.columns]
+        if not common_keys:
+            continue
+
+        merge_cols = common_keys + available_value_cols
+        part = df_part.loc[:, merge_cols].copy().drop_duplicates()
+
+        out = out.merge(part, on=common_keys, how="left", suffixes=("", "_part"))
+
+        for col in available_value_cols:
+            part_col = f"{col}_part"
+            if part_col in out.columns:
+                if col in out.columns:
+                    out[col] = out[col].fillna("").astype(str)
+                    out[part_col] = out[part_col].fillna("").astype(str)
+                    out[col] = out[col].where(out[col].str.strip() != "", out[part_col])
+                else:
+                    out[col] = out[part_col]
+                out = out.drop(columns=[part_col])
+
+    return out
+
+
 def _build_report_df(api_key: str, bgn_de: str, end_de: str, report_name: str, report_filter_text: str | None,
                      page_count: int, timeout: int, verify_ssl: bool) -> pd.DataFrame:
     filtered = [
@@ -434,6 +471,7 @@ def run_rights_issue_report(
         else:
             df_base = pd.merge(df_base, df_kind)
 
+        df_base = merge_estk_detail_columns(df_base, dfs)
         df_base = merge_company_overview(df_base, overview)
         df_base["URL"] = df_base["rcept_no"].apply(
             lambda x: f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={x}"
@@ -620,6 +658,7 @@ def run_rights_issue_report_bytes(
         else:
             df_base = pd.merge(df_base, df_kind)
 
+        df_base = merge_estk_detail_columns(df_base, dfs)
         df_base = merge_company_overview(df_base, overview)
         df_base["URL"] = df_base["rcept_no"].apply(
             lambda x: f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={x}"
