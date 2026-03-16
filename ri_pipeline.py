@@ -130,6 +130,45 @@ def get_company_overview_df(api_key: str, corp_code: str) -> pd.DataFrame:
     return df
 
 
+def get_company_overview_fields(api_key: str, corp_code: str) -> pd.DataFrame:
+    url = "https://opendart.fss.or.kr/api/company.json"
+    params = {
+        "crtfc_key": api_key,
+        "corp_code": corp_code,
+    }
+
+    resp = requests.get(url, params=params, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+
+    if data.get("status") != "000":
+        raise RuntimeError(f"[{data.get('status')}] {data.get('message')}")
+
+    return pd.DataFrame(
+        [
+            {
+                "corp_code": corp_code,
+                "bizr_no": data.get("bizr_no", ""),
+                "ceo_nm": data.get("ceo_nm", ""),
+                "adres": data.get("adres", ""),
+                "phn_no": data.get("phn_no", ""),
+                "fax_no": data.get("fax_no", ""),
+            }
+        ]
+    )
+
+
+def format_bizr_no(value) -> str:
+    if pd.isna(value):
+        return ""
+
+    text = str(value).strip()
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if len(digits) == 10:
+        return f"{digits[:3]}-{digits[3:5]}-{digits[5:]}"
+    return text
+
+
 def _build_report_df(api_key: str, bgn_de: str, end_de: str, report_name: str, report_filter_text: str | None,
                      page_count: int, timeout: int, verify_ssl: bool) -> pd.DataFrame:
     filtered = [
@@ -328,7 +367,7 @@ def run_rights_issue_report(
             continue
 
         try:
-            overview = get_company_overview_df(api_key, corp_code).loc[:, ["고유번호", "대표자명", "주소", "전화번호", "팩스번호"]]
+            overview = get_company_overview_fields(api_key, corp_code)
         except Exception:
             print(f"[SKIP] {corp_code} 기업개요 없음")
             continue
@@ -339,7 +378,7 @@ def run_rights_issue_report(
         else:
             df_base = pd.merge(df_base, df_kind)
 
-        df_base = df_base.merge(overview, left_on="corp_code", right_on="고유번호")
+        df_base = df_base.merge(overview, on="corp_code", how="left")
         df_base["URL"] = df_base["rcept_no"].apply(
             lambda x: f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={x}"
         )
@@ -350,6 +389,8 @@ def run_rights_issue_report(
         df_5 = dfs.get("인수인정보", pd.DataFrame())
 
         df_base = df_base.rename(columns=MAP_DICT)
+        if "사업자등록번호" in df_base.columns:
+            df_base["사업자등록번호"] = df_base["사업자등록번호"].apply(format_bizr_no)
         df_2 = df_2.rename(columns=MAP_DICT)
         df_3 = df_3.rename(columns=MAP_DICT)
         df_4 = df_4.rename(columns=MAP_DICT)
@@ -374,6 +415,7 @@ def run_rights_issue_report(
 
     sort_cols = [
         "회사명",
+        "사업자등록번호",
         "상장구분",
 #        "증권의종류",
         "증권수량",
@@ -509,7 +551,7 @@ def run_rights_issue_report_bytes(
             continue
 
         try:
-            overview = get_company_overview_df(api_key, corp_code).loc[:, ["고유번호", "대표자명", "주소", "전화번호", "팩스번호"]]
+            overview = get_company_overview_fields(api_key, corp_code)
         except Exception:
             continue
 
@@ -519,7 +561,7 @@ def run_rights_issue_report_bytes(
         else:
             df_base = pd.merge(df_base, df_kind)
 
-        df_base = df_base.merge(overview, left_on="corp_code", right_on="고유번호")
+        df_base = df_base.merge(overview, on="corp_code", how="left")
         df_base["URL"] = df_base["rcept_no"].apply(
             lambda x: f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={x}"
         )
@@ -530,6 +572,8 @@ def run_rights_issue_report_bytes(
         df_5 = dfs.get("인수인정보", pd.DataFrame())
 
         df_base = df_base.rename(columns=MAP_DICT)
+        if "사업자등록번호" in df_base.columns:
+            df_base["사업자등록번호"] = df_base["사업자등록번호"].apply(format_bizr_no)
         df_2 = df_2.rename(columns=MAP_DICT)
         df_3 = df_3.rename(columns=MAP_DICT)
         df_4 = df_4.rename(columns=MAP_DICT)
@@ -554,6 +598,7 @@ def run_rights_issue_report_bytes(
 
     sort_cols = [
         "회사명",
+        "사업자등록번호",
         "상장구분",
 #        "증권의종류",
         "증권수량",
