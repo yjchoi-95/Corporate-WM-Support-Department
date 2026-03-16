@@ -22,6 +22,7 @@ LIST_API_URL = "https://opendart.fss.or.kr/api/list.json"
 PIIC_API_URL = "https://opendart.fss.or.kr/api/piicDecsn.json"
 CB_API_URL = "https://opendart.fss.or.kr/api/cvbdIsDecsn.json"
 BW_API_URL = "https://opendart.fss.or.kr/api/bdwtIsDecsn.json"
+COMPANY_API_URL = "https://opendart.fss.or.kr/api/company.json"
 DOC_API_URL = "https://opendart.fss.or.kr/api/document.xml"
 
 PAID_INCREASE_REPORT_TITLES = {
@@ -41,6 +42,7 @@ TARGET_REPORT_TITLES = PAID_INCREASE_REPORT_TITLES | CB_REPORT_TITLES | BW_REPOR
 
 OUT_RENAME_MAP = {
     "corp_name": "회사명",
+    "bizr_no": "사업자등록번호",
     "ic_mthn": "증자방식",
     "fdpp_sum": "발행금액",
     "nstk_ps": "발행가액",
@@ -50,6 +52,7 @@ OUT_RENAME_MAP = {
 
 OUT_COLUMNS = [
     "회사명",
+    "사업자등록번호",
     "증자방식",
     "발행주식수",
     "발행가액",
@@ -66,6 +69,7 @@ OUT_COLUMNS = [
 
 CB_BW_OUT_COLUMNS = [
     "회사명",
+    "사업자등록번호",
     "사채종류",
     "사채총액",
     "청약일",
@@ -290,6 +294,45 @@ def _select_and_rename_columns(df: pd.DataFrame, mapping: dict[str, str]) -> pd.
     return selected
 
 
+def fetch_company_overview_df(
+    api_key: str,
+    corp_codes: list[str],
+    sleep_sec: float = 0.05,
+    timeout: int = 30,
+) -> pd.DataFrame:
+    rows: list[dict[str, str]] = []
+
+    for corp_code in corp_codes:
+        params = {
+            "crtfc_key": api_key,
+            "corp_code": corp_code,
+        }
+        try:
+            resp = requests.get(COMPANY_API_URL, params=params, timeout=timeout)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception:
+            time.sleep(sleep_sec)
+            continue
+
+        if str(data.get("status")) != "000":
+            time.sleep(sleep_sec)
+            continue
+
+        rows.append(
+            {
+                "corp_code": corp_code,
+                "bizr_no": data.get("bizr_no", ""),
+            }
+        )
+        time.sleep(sleep_sec)
+
+    if not rows:
+        return pd.DataFrame(columns=["corp_code", "bizr_no"])
+
+    return pd.DataFrame(rows).drop_duplicates(subset=["corp_code"]).reset_index(drop=True)
+
+
 def fetch_paid_increase_decision_df(
     api_key: str,
     major_list_df: pd.DataFrame,
@@ -368,11 +411,24 @@ def fetch_cb_bw_unified_df(
     cb_df = _filter_by_rcept_window(_merge_target_metadata(cb_df, cb_target), bgn_de, end_de)
     bw_df = _filter_by_rcept_window(_merge_target_metadata(bw_df, bw_target), bgn_de, end_de)
 
+    overview_df = fetch_company_overview_df(
+        api_key=api_key,
+        corp_codes=sorted(set(cb_codes + bw_codes)),
+        sleep_sec=sleep_sec,
+        timeout=timeout,
+    )
+    if not overview_df.empty:
+        if not cb_df.empty and "corp_code" in cb_df.columns:
+            cb_df = cb_df.merge(overview_df, on="corp_code", how="left")
+        if not bw_df.empty and "corp_code" in bw_df.columns:
+            bw_df = bw_df.merge(overview_df, on="corp_code", how="left")
+
     cb_map = {
         "rcept_no": "접수번호",
         "corp_cls": "법인구분",
         "corp_code": "고유번호",
         "corp_name": "회사명",
+        "bizr_no": "사업자등록번호",
         "bd_knd": "사채종류",
         "bd_fta": "사채총액",
         "sbd": "청약일",
@@ -387,6 +443,7 @@ def fetch_cb_bw_unified_df(
         "corp_cls": "법인구분",
         "corp_code": "고유번호",
         "corp_name": "회사명",
+        "bizr_no": "사업자등록번호",
         "bd_knd": "사채종류",
         "bd_fta": "사채총액",
         "sbd": "청약일",
@@ -560,7 +617,7 @@ def build_output_df(piic_df: pd.DataFrame, fulltext_df: pd.DataFrame) -> pd.Data
         return pd.DataFrame()
 
     name_col = "corp_name" if "corp_name" in piic_df.columns else "corp_name_x"
-    keep_cols = [c for c in ["rcept_no", name_col, "ic_mthn", "fdpp_sum", "nstk_ps", "nstk_sum", "URL"] if c in piic_df.columns]
+    keep_cols = [c for c in ["rcept_no", name_col, "bizr_no", "ic_mthn", "fdpp_sum", "nstk_ps", "nstk_sum", "URL"] if c in piic_df.columns]
     out = piic_df[keep_cols].copy()
 
     if name_col != "corp_name":
@@ -737,6 +794,14 @@ def run_major_paid_increase_report_bytes(
     )
     output_df = pd.DataFrame(columns=OUT_COLUMNS)
     if not piic_df.empty:
+        piic_overview_df = fetch_company_overview_df(
+            api_key=api_key,
+            corp_codes=piic_df["corp_code"].dropna().astype(str).unique().tolist(),
+            sleep_sec=sleep_sec,
+            timeout=request_timeout,
+        )
+        if not piic_overview_df.empty and "corp_code" in piic_df.columns:
+            piic_df = piic_df.merge(piic_overview_df, on="corp_code", how="left")
         piic_df = add_finance_columns(piic_df)
         fulltext_df = fetch_report_fulltext_df(api_key, piic_df, timeout=list_timeout)
         output_df = build_output_df(piic_df, fulltext_df)
