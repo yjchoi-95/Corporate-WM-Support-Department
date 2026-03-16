@@ -465,12 +465,6 @@ def run_rights_issue_report(
             print(f"[WARN] {corp_code} 기업개요 없음")
             overview = get_empty_company_overview_fields(corp_code)
 
-        df_kind = dfs.get("증권의종류")
-        if df_kind is None or df_kind.empty:
-            df_base = df_base.copy()
-        else:
-            df_base = pd.merge(df_base, df_kind)
-
         df_base = merge_estk_detail_columns(df_base, dfs)
         df_base = merge_company_overview(df_base, overview)
         df_base["URL"] = df_base["rcept_no"].apply(
@@ -651,12 +645,6 @@ def run_rights_issue_report_bytes(
             overview = get_company_overview_fields(api_key, corp_code)
         except Exception:
             overview = get_empty_company_overview_fields(corp_code)
-
-        df_kind = dfs.get("증권의종류")
-        if df_kind is None or df_kind.empty:
-            df_base = df_base.copy()
-        else:
-            df_base = pd.merge(df_base, df_kind)
 
         df_base = merge_estk_detail_columns(df_base, dfs)
         df_base = merge_company_overview(df_base, overview)
