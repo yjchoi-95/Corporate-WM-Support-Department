@@ -333,6 +333,17 @@ def fetch_company_overview_df(
     return pd.DataFrame(rows).drop_duplicates(subset=["corp_code"]).reset_index(drop=True)
 
 
+def format_bizr_no(value) -> str:
+    if pd.isna(value):
+        return ""
+
+    text = str(value).strip()
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if len(digits) == 10:
+        return f"{digits[:3]}-{digits[3:5]}-{digits[5:]}"
+    return text
+
+
 def fetch_paid_increase_decision_df(
     api_key: str,
     major_list_df: pd.DataFrame,
@@ -694,6 +705,8 @@ def format_output_df(output_df: pd.DataFrame) -> pd.DataFrame:
         return output_df.copy()
 
     df = output_df.rename(columns=OUT_RENAME_MAP).copy()
+    if "사업자등록번호" in df.columns:
+        df["사업자등록번호"] = df["사업자등록번호"].apply(format_bizr_no)
     if "증자방식" in df.columns:
         df = df.loc[df["증자방식"].apply(is_third_party_allotment)].copy()
     for col in OUT_COLUMNS:
@@ -707,6 +720,8 @@ def format_cb_bw_output_df(output_df: pd.DataFrame) -> pd.DataFrame:
         return output_df.copy()
 
     df = output_df.copy()
+    if "사업자등록번호" in df.columns:
+        df["사업자등록번호"] = df["사업자등록번호"].apply(format_bizr_no)
     for col in CB_BW_OUT_COLUMNS:
         if col not in df.columns:
             df[col] = ""
